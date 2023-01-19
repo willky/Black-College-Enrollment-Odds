@@ -1,0 +1,3 @@
+"0","IPUMS_BLK <- "
+"0","  IPUMS %>% "
+"0","  filter(RACE == ""BLACK"")"

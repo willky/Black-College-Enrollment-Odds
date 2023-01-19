@@ -1,0 +1,420 @@
+---
+title: "College Enrollment Odds Among Black People: A Logit Model"
+author: "William Kyeremateng"
+date: "May 05, 2018"
+output:
+  html_document:
+    theme: cerulean
+    toc: true
+    toc_float: true
+    df_print: paged
+spacing: double
+---
+
+<style type="text/css">
+  body{
+  font-size: 12pt;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 5, fig.align = "center")
+```
+
+![Source: www.redbubble.com](/Users/aly_will_mac/Desktop/OLD PC/WILL/LEARNING/1. ALL PROJECTS/College Attain_Logistic Reg/coverpage.png){width=100%}
+
+## 1. Introduction
+
+This project examine the factors that may account for the differences in college enrollment odds among black people. Native born Blacks. Literature on the topic shows that in the Black community (everyone considered as having African origins), college enrollment rates for students with immigrant parents are higher than those for students with parents born in the U.S. Understanding this question may help measure the scale of societal discrimination versus other factors that account for the education success gap. 
+
+Among a number of others, this analysis seeks to mainly answer the question: **is there a difference in college enrollment odds between children from US-born Black households and those from immigrants households?** Lower college enrollment rates for students with native-born Black parents than Black students with immigrant parents would imply that discrimination alone does not explain the success gap.
+
+
+## 2. Data {.tabset .tabset-fade .tabset-pills}
+
+The data used in this project comes from the Current Population Survey (CPS) - a monthly survey of U.S. households conducted by the Bureau of Labor Statistics for the Census Bureau. The CPS data used here is from the March 2013 survey and was accessed through the IPUMS project of the Minnesota Population Center at the University of Minnesota. 
+
+Before uploading the I load the packages containing the various functions we will be using for the analysis. They include `tidyverse`, `visdat`, `summarytools`, `plotly`, among others.
+
+```{r}
+library(knitr)
+library(tidyverse)
+library(visdat)
+library(summarytools)
+library(plotly)
+library(janitor)
+library(kableExtra)
+library(DataExplorer)
+library(Amelia)
+```
+
+Let's upload the data.
+
+```{r}
+IPUMS <- read_csv("IPUMSCPS2013_Original.csv")
+```
+
+Here are the top and bottom rows of the data.
+
+### Head
+
+```{r}
+IPUMS %>% head(5)
+```
+
+### Tail
+
+```{r}
+IPUMS %>% tail(5)
+```
+
+Now, let us look at the summary and structure of the data.
+
+```{r}
+print(dfSummary(IPUMS), method = 'render')
+```
+
+
+## 3. Data Wrangling
+
+In this section, I clean the data to get it ready for modelling.
+
+### 3.1. Create New Variables
+
+The first thing I do is create new variables out of the existing ones. It involves breaking up categorical variables with multiple levels into binary variables that will be used in the regression. Some of the dummy variables created include `AFRICAN_HEAD`, `CARRIBEAN_HEAD`. 
+
+```{r}
+IPUMS <- IPUMS %>% 
+  mutate(
+    COLL_ATT = case_when(SCHLCOLL %in% c(3,4) ~ "YES", TRUE ~ "NO"),
+    SEX = case_when(SEX == 2 ~ "FEMALE", TRUE ~ "0_MALE"),                      #female=1
+    CITIZEN = case_when(CITIZEN %in% c(1,2,3,5) ~ "YES", TRUE ~ "NO"),          #citizen=1
+    STABLEMARRIAGE = case_when(MARST_HEAD == 1 ~ "YES", TRUE ~ "NO"),           #Married,Spouse Present=1
+    BACHELORS_HEAD = case_when(EDUC99_HEAD >=15 ~ "YES", TRUE ~ "NO"),
+    RACE = case_when(
+                     (RACE==100 & HISPAN==0) ~ "0_WHITE",
+                     (RACE==200 & HISPAN==0) ~ "BLACK",
+                     (RACE==300 & HISPAN==0) ~ "NATIVEAMERICAN",
+                     (RACE==651 & HISPAN==0) ~ "ASIAN",
+                     (RACE==652 & HISPAN==0) ~ "PACIFICISLANDER",
+                     between(RACE, 801, 830) ~ "MIXED RACE",
+                     TRUE ~ "OTHER"),
+    HISPANIC = case_when(between(HISPAN, 100, 612) ~ "YES", TRUE ~ "NO"),
+    FOREIGN_HEAD = case_when(NATIVITY_HEAD==5 ~ "YES", TRUE ~ "NO"),
+    BPL_HEAD = case_when(
+                         BPL_HEAD == 9900 ~ "0_US",
+                         between(BPL_HEAD, 25000, 26091) ~ "CARIBBEAN",
+                         between(BPL_HEAD, 60010, 60099) ~ "AFRICA",
+                         TRUE ~ "OTHER"
+                      )
+          )
+```
+
+### 3.2. Remove Unwanted Observations
+
+Some of the main variables used in this work have observations that fall outside the scope of the analysis. I remove them from the data.
+
++ **AGE:** The analysis focuses on respondents of college-going age and their families. Hence, I set the age criteria to 18 and 25 years, excluding repondents who fall outside of that age range.
+
++ **FTOTVAL:** Some respondents reported income levels of \$0 or less (see summary table in Section 3). Since the analyses focuses on working families, I treat those with no incomes as outliers and remove them from our analysis.
+
+Now, let's execute the cleaning listed above.
+
+```{r}
+IPUMS <- IPUMS %>% 
+  filter(AGE >= 18 & AGE <= 25 & 
+         FTOTVAL > 0)
+```
+
+After removing the unwanted age groups and those with no income, we are left with `r nrow(IPUMS)` total number of observations.
+
+### 3.3. Remove Unwanted Variables
+
+I keep only variables needed for the analysis - there are about 12 of them. The rest are excluded from this work.
+
+```{r}
+IPUMS <- IPUMS %>% 
+  select("STATEFIP","AGE","FTOTVAL","SEX","BACHELORS_HEAD","STABLEMARRIAGE",
+         "FOREIGN_HEAD","BPL_HEAD", "CITIZEN","RACE","HISPANIC","COLL_ATT")
+```
+
+### 3.4. Convert Binary Variables from `numeric` to `factor` {.tabset .tabset-fade .tabset-pills}
+
+All the categorical variables have been classified as `character` variables in R. I change them to factors, as this matters for the regression analysis.
+
+#### Current Data Types
+
+```{r fig.width = 12, fig.height = 5, fig.align = "center"}
+IPUMS %>% vis_dat()
+```
+
+#### Binary Variables Changed to Factors
+
+```{r fig.width = 12, fig.height = 5, fig.align = "center"}
+IPUMS <- 
+  IPUMS %>%
+  mutate(across(c(4:12), factor))
+
+IPUMS %>% vis_dat()
+```
+
+
+### 3.5. Check for Missing Values
+
+The summary table indicated that some of the columns had missing values. Let's check to see if there are still present even after doing some cleaning.
+
+```{r fig.width = 12, fig.height = 5, fig.align = "center"}
+IPUMS %>% missmap(main = "Missing vs. Observed Values")
+```
+
+From the chart above, there are no missing values in our data. It seems removing respondents outside the age group we need and those with no incomes took care of the missing values.
+
+### 3.6. Check for Duplicated Rows
+
+The summary table above showed that there were duplicated rows. Let's check to see if they are still present and consolidate them.
+
+```{r}
+IPUMS %>% get_dupes() %>% 
+            count() %>% 
+            kbl(align = "c",
+                col.names = "Number of Duplicated Rows",
+                format.args = list(big.mark = ",")) %>% 
+            kable_classic_2(c("striped", "hover"), 
+                            full_width = F, 
+                            html_font = "Caliri")
+```
+
+Now, let's keep only unique rows and confirm that all the duplicates have been delt with.
+
+```{r, echo=FALSE, message=FALSE}
+IPUMS <- IPUMS %>% distinct(across())
+
+
+IPUMS %>% get_dupes() %>% 
+            count() %>% 
+            kbl(align = "c",
+                col.names = "Number of Duplicated Rows",
+                format.args = list(big.mark = ",")) %>% 
+            kable_classic_2(c("striped", "hover"), 
+                            full_width = F, 
+                            html_font = "Caliri")
+```
+
+## 4. Exploratory Data Analysis
+
+Now that we have our final data for the analysis, let's do some EDA.
+
+### 4.1. Check for Multicollinearity
+
+One of the main assumptions for logistic regressions is that there be no collinearity/multicollinearity among the explanatory variables. This means that the predictor variables must not have a high correlation or association. Hence, I check the correlation among all the variables I intend to use as predictor variables in the logistic regression model.
+
+```{r fig.width = 12, fig.height = 10, fig.align = "center"}
+IPUMS %>% 
+  select("AGE","FTOTVAL","SEX","BACHELORS_HEAD","STABLEMARRIAGE", 
+         "FOREIGN_HEAD","BPL_HEAD", "CITIZEN","RACE","HISPANIC","COLL_ATT") %>% 
+  plot_correlation()
+```
+
+From the plot, there appear to be strong positive correlation between some pair of variables. `RACE_OTHER` and `HISPANICS` are highly correlated. This makes sense since most Hispanics probably identify as "other" when it comes to race. 
+
+There is also high correlation between the birth place of heads of household (BPL_HEAD) and their status as a foreigner (FOREIGN_HEAD). Again, this makes sense as most non-U.S. born heads of households are from other continents besides Africa and Caribbean.
+
+It is important to keep track of which two or more variables are highly correlated. Using them as explanatory variables in the same model would  cause multicollinearity issues, affecting the overall validity of the model.
+
+## 5. Modeling: Logistic Regression
+
+Using logit regression models, I attempt to answer the main question: **is there a difference in college enrollment rates between Native-born Blacks household children and African immigrants household children?**.
+
+But before modeling enrollment rates among Black people, I look at college enrollment rates in the overall population with emphasis on the differences in enrollment rates between whites and other races and Hispanics. I also look at college enrollment rates in California to determine if the State's ban on affirmative action in 1996 has had any impact on college enrollment rates.
+
+The dependent variable for the regression is `COLL_ATT`.
+
+### 5.1. Overall Enrollment Odds 
+
+Let's start with enrollment rates in the overall sample and compare enrollment rates among other races to that of whites.
+
+```{r}
+IPUMS.logit <- 
+  glm(formula = COLL_ATT ~ AGE + SEX + FTOTVAL + 
+                           BACHELORS_HEAD + STABLEMARRIAGE + 
+                           RACE + HISPANIC,
+      family = binomial(link="logit"), 
+      data = IPUMS)
+
+summary(IPUMS.logit)
+```
+
+From the regression, the following variables  are statistically significant at 95% confidence interval: `AGE`, `SEX(FEMALE)`, `FTOTVAL`, `BACHELORS_HEAD`, and `RACE (ASIAN & NATIVE AMERICAN)`. The aforementiond variable influence college enrollment odds - some positively, others negatively.
+
+**Odds Ratio**
+
+```{r}
+coef(IPUMS.logit) %>% exp()
+```
+
+**Interpreting the Regression Results**
+
+Assuming all else are equal, we can make the following inferences from the model: 
+
++ A one unit in age (in this case year) reduces a person's odds of enrolling in college by approximately `r round((1-0.8788871), 3)*100`%. 
++ Females have `r round((1.4720860-1), 3)*100`% higher odds of enrolling in college compared to males. 
++ A one unit increase in total family income (FTOTVAL) barely raises a person's college enrollment odds  (`r format(round((1.0000024-1), 6)*100, scientific = F)`%). This is expected as the availability of student loans make it easier for people from poor backgrounds to attend.
++ Having a head of household with at least a bachelors degree increases a person's odds of college enrollment by about `r round((1.6661371-1), 3)*100`%.
++ Compared to White people, Asians have `r round((1.6661371-1), 3)*100`% higher odds of enrolling in college, while Native Americans have `r round((1-0.4872177), 3)*100`% lower odds.
+
+**Note:** Because they are not statistically significant, we cannot make any inferences about enrollment rates when comparing college enrollment among Blacks, Pacific Islanders, Hispanics, Mixed Race and Other races to that among Whites. We also cannot make any conclusion about the odds of enrollment for people coming from statble homes.
+
+
+### 5.2. College Enrollment Among Californians
+
+In 1996, the State of California banned the use of affirmative action. To test the effects of the ban on college enrollment rates, let's restrict our sample in this regression to the state of California. 
+
+```{r}
+IPUMS_CALI <- 
+  IPUMS %>% 
+  filter(STATEFIP == 6)
+```
+
+The size of the sample for our analysis is `r nrow(IPUMS_CALI)`.
+
+```{r}
+IPUMS_CALI.logit <- 
+  glm(formula = COLL_ATT ~ AGE + SEX + FTOTVAL + RACE + HISPANIC +
+                           BACHELORS_HEAD + STABLEMARRIAGE,
+      family = binomial(link="logit"), 
+      data = IPUMS_CALI)
+
+summary(IPUMS_CALI.logit)
+```
+
+**Odds Ratio**
+
+```{r}
+IPUMS_CALI.logit %>% coef() %>% exp()
+```
+
+**Interpreting the Regression Results** 
+
++ A one unit in age reduces college enrollment odds  by approximately `r round((1-0.8711127), 3)*100`%. 
++ Females have `r round((1.3691359-1), 3)*100`% higher enrollment odds compared to males. 
++ Compared to White people, college enrollment odds are `r round((1.5273463-1), 3)*100`% higher for Asians enrolling in college and `r round((2.1492991-1), 3)*100`% higher for mixed race individuals.
++ College enrollment odds among Blacks, Hispanics, Native Americans, Pacific Islanders and other races are not statistically compared to white enrollment. Hence, no meaningful inferences can be about the effects of the of California's affirmative action ban on enrollment odds among those groups.
+
+### 5.3. College Enrollment Rates Among Black People
+
+In the second part of this analysis, I take at college enrollment rates among black people only. To begin, let's pull a subset respondents who identify solely as black and nothing else.
+
+```{r}
+IPUMS_BLK <- 
+  IPUMS %>% 
+  filter(RACE == "BLACK")
+```
+
+
+#### 5.3.1. Baseline Regression: Enrollment Rates Among Black People
+
+First, I look at college enrollment odds among all black people.
+
+```{r}
+IPUMS_BLK.logit <- glm(formula = COLL_ATT ~ AGE + SEX + FTOTVAL + 
+                                      BACHELORS_HEAD + STABLEMARRIAGE,
+                   family = binomial(link="logit"), 
+                   data = IPUMS_BLK)
+
+summary(IPUMS_BLK.logit)
+```
+
+**Odds Ratio**
+
+```{r}
+IPUMS_BLK.logit %>% coef() %>% exp()
+```
+
+**Interpreting the Regression Results**
+
+All variables included are statistically significant when it comes to college enrollment rates among black people. From the odds ratios, we can make following conclusions about the effects of each variable on black college enrollment rates.
+
++ A unit increase in age reduces a black person's college enrollment odds by about `r round((1-0.9201399), 3)*100`%.
++ Black females have `r round((1.8282154-1), 3)*100`% higher odds of enrolling in college compared to black males.
++ Blacks from high income households have marginally higher odds of enrolling in college - similar to the overall population.
++ The head of households having at least a bachelors degree raises a black person's odds of college enrollment by about `r round((1.8878493-1), 3)*100`%.
++ Lastly, black people from stable homes, with two parents present, have `r round((1.2715211-1), 3)*100`% higher odds of enrollment compared those from non-stable homes.
+
+
+#### 5.3.2. Black Households with Foreigners as Head 
+
+What if the head of a black household is a foreigner, meaning they are not from the U.S. or any of its territories? Does that affect the odds of college enrollment for a black person from such a household?
+
+```{r}
+IPUMS_BLK2.logit <- glm(formula = COLL_ATT ~ AGE + SEX + FTOTVAL + 
+                                      BACHELORS_HEAD + STABLEMARRIAGE + FOREIGN_HEAD,
+                   family = binomial(link="logit"), 
+                   data = IPUMS_BLK)
+
+summary(IPUMS_BLK2.logit)
+```
+
+**Odds Ratio**
+
+```{r}
+exp(coef(IPUMS_BLK2.logit))
+```
+
+**Interpreting the Regression Results**
+
++ The odds of a black person enrolling in college is `r round((1.7707180-1), 3)*100`% higher if they come from a home where the head of household has at least a bachelors degree.
++ The other variables in the regression have the same effects on black college enrollment as described in  Section 3.3.1.
+
+#### 5.3.3. Does Citizenship matter for Black Enrollment Rates?
+
+Let's look citizenship status of the respondents. Does citizenship affect a black person's chances of enrolling in college?
+
+```{r}
+IPUMS_BLK3.logit <- 
+  glm(formula = COLL_ATT ~ AGE + SEX + FTOTVAL + 
+                           BACHELORS_HEAD + STABLEMARRIAGE + 
+                           FOREIGN_HEAD + CITIZEN,
+      family = binomial(link="logit"), 
+      data = IPUMS_BLK)
+
+summary(IPUMS_BLK3.logit)
+```
+
+**Odds Ratio**
+
+```{r}
+exp(coef(IPUMS_BLK3.logit))
+```
+
+**Interpreting the Regression Results**
+
++ From the regression, citizenship status of the respondent is not statistically significant. Hence, we cannot make any meaningful inference about its effects on college enrollment odds for black people.
++ The other variables in the regression have the same effects on black college enrollment as described in  sections.
+
+#### 5.3.4. What if the Head of Household is an Immigrant?
+
+In this section, I assess how college enrollment odds differ for black children with an immigrant as head of household compared to those with non-immigrant head of household. I pay particular to those with African or Caribbeans as head of household since majority of the black immigrant population come from African and Caribbean countries.
+
+```{r}
+IPUMS_BLK4.logit <- glm(formula = COLL_ATT ~ AGE + SEX + FTOTVAL + 
+                                             BACHELORS_HEAD + STABLEMARRIAGE + 
+                                             BPL_HEAD,
+                        family = binomial(link="logit"), 
+                        data = IPUMS_BLK)
+
+summary(IPUMS_BLK4.logit)
+```
+
+**Odds Ratio**
+
+```{r}
+IPUMS_BLK4.logit %>% coef() %>% exp()
+```
+
+**Interpreting the Regression Results**
+
+Compared to black respondents with non-immigrant head of household, those from homes with African or Caribbean heads of household have `r round((1.8261698-1), 3)*100`% and `r round((1.7559120-1), 3)*100`% higher odds of college enrollment, respectively. 
+
+Literature (Bennett and Lutz, 2009) suggests that immigrant parents have higher educational attainments compared to parents of native blacks and that perhaps has an effect on the differences in college enrollment odds between their children.
+

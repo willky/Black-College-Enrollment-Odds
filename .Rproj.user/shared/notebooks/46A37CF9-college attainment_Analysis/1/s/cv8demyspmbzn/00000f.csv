@@ -1,0 +1,3 @@
+"0","IPUMS <- IPUMS %>% "
+"0","  filter(AGE >= 18 & AGE <= 25 & "
+"0","         FTOTVAL > 0)"

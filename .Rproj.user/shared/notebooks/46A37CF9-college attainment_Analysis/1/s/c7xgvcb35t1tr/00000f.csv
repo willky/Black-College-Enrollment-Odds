@@ -1,0 +1,4 @@
+"0","IPUMS %>% "
+"0","  select(""AGE"",""FTOTVAL"",""SEX"",""BACHELORS_HEAD"",""STABLEMARRIAGE"", "
+"0","         ""FOREIGN_HEAD"",""BPL_HEAD"", ""CITIZEN"",""RACE"",""HISPANIC"",""COLL_ATT"") %>% "
+"0","  plot_correlation()"

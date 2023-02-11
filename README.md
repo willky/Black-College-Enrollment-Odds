@@ -1,5 +1,5 @@
-# College-Enrollment-Odds
+# Black-College-Enrollment-Odds
 
-This project examine the factors that may account for the differences in college enrollment odds among black people. Native born Blacks. Literature on the topic shows that in the Black community (everyone considered as having African origins), college enrollment rates for students with immigrant parents are higher than those for students with parents born in the U.S. Understanding this question may help measure the scale of societal discrimination versus other factors that account for the education success gap. 
+This project examine the factors that may account for the differences in college enrollment odds among black students. Native born Blacks. Literature on the topic shows that in the Black community (everyone considered as having African origins), college enrollment rates for students with immigrant parents are higher than those for students with parents born in the U.S. Understanding this question may help measure the scale of societal discrimination versus other factors that account for the education success gap. 
 
 Among a number of others, this analysis seeks to mainly answer the question: **is there a difference in college enrollment odds between children from US-born Black households and those from immigrants households?** Lower college enrollment rates for students with native-born Black parents than Black students with immigrant parents would imply that discrimination alone does not explain the success gap.

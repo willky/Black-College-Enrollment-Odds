@@ -1,7 +1,7 @@
 ---
-title: "College Enrollment Odds Among Black People: A Logit Model"
+title: "College Enrollment Odds Among Black Students: A Logit Model"
 author: "William Kyeremateng"
-date: "May 05, 2019"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
 output:
   html_document:
     theme: cerulean
@@ -22,7 +22,7 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
                       fig.width = 10, fig.height = 5, fig.align = "center")
 ```
 
-![Source: www.redbubble.com](/Users/aly_will_mac/Desktop/OLD PC/WILL/LEARNING/1. ALL PROJECTS/College-Enrollment-Odds/coverpage.png){width=100%}
+![Source: www.redbubble.com](/Users/aly_will_mac/Desktop/OLD PC/WILL/LEARNING/1. ALL PROJECTS/Black-College-Enrollment-Odds/coverpage.png){width=100%}
 
 ## 1. Introduction
 
@@ -52,7 +52,7 @@ library(Amelia)
 Let's upload the data.
 
 ```{r}
-IPUMS <- read_csv("IPUMSCPS2013_Original.csv")
+IPUMS <- read_csv("/Users/aly_will_mac/Desktop/OLD PC/WILL/LEARNING/1. ALL PROJECTS/Black-College-Enrollment-Odds/Data/IPUMSCPS2013_Original.csv")
 ```
 
 Here are the top and bottom rows of the data.

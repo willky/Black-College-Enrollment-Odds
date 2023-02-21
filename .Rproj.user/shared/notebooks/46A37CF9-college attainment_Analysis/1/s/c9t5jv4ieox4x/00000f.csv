@@ -1,3 +1,0 @@
-"0","IPUMS_CALI <- "
-"0","  IPUMS %>% "
-"0","  filter(STATEFIP == 6)"

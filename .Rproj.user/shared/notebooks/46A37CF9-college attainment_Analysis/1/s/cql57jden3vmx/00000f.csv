@@ -1,3 +1,0 @@
-"0","IPUMS <- IPUMS %>% "
-"0","  select(""STATEFIP"",""AGE"",""FTOTVAL"",""SEX"",""BACHELORS_HEAD"",""STABLEMARRIAGE"","
-"0","         ""FOREIGN_HEAD"",""BPL_HEAD"", ""CITIZEN"",""RACE"",""HISPANIC"",""COLL_ATT"")"

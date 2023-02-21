@@ -1,5 +1,0 @@
-"0","IPUMS <- "
-"0","  IPUMS %>%"
-"0","  mutate(across(c(4:12), factor))"
-"0",""
-"0","IPUMS %>% vis_dat()"
